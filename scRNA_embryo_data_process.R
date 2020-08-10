@@ -181,3 +181,129 @@ pdf("heatmap_clusters_canonical_with_key_2020_07_12.pdf",width=10,height=8,useDi
 DoHeatmap(object = embryo.integrated, features = as.character(genes_to_use),group.colors=c("dodgerblue","olivedrab3","firebrick","darkviolet"),size=4)+
   scale_fill_gradientn(colors=c("blue","white","red"))
 dev.off()
+#---------------------------------------------
+#Figure 1c-f
+#Read in ensembl annotation for gene name conversion
+ensembl_geneid=read.table("ensembl_geneid.txt",header=T,sep="\t")
+ensembl_geneid=ensembl_geneid[ensembl_geneid$Ensembl.gene.ID!="",]
+genes=ensembl_geneid$Approved.symbol
+names(genes)=ensembl_geneid$Ensembl.gene.ID
+
+#Read in data from Stirparo et al and convert to proper gene names
+cell_info = read.table("Stirparo_cellinfo.txt",header=T,sep="\t")
+embryo_stirparo_raw = read.table("Stirparo_FPKM.txt",header=T,sep="\t")
+embryo_stirparo_raw_mat=embryo_stirparo_raw[,3:ncol(embryo_stirparo_raw)]
+unique_rownames = embryo_stirparo_raw$Gene
+unique_rownames[duplicated(unique_rownames)] = embryo_stirparo_raw$Ensembl.ID[duplicated(unique_rownames)]
+embryo_stirparo_raw_mat=apply(embryo_stirparo_raw_mat,2,as.numeric)
+rownames(embryo_stirparo_raw_mat)=unique_rownames
+
+#Create Seurat object
+embryo_stirparo=CreateSeuratObject(counts = embryo_stirparo_raw_mat)
+embryo_stirparo <- NormalizeData(object = embryo_stirparo)
+embryo_stirparo <- ScaleData(object = embryo_stirparo)
+
+#Integrate using the anchor method, in effect a batch correction - Note: this needs the own data prior to batch correction
+anchors <- FindIntegrationAnchors(object.list = c(batched_seurat_list,embryo_stirparo), dims = 1:30,k.filter=50)
+all_genes=union(rownames(embryo.integrated),rownames(embryo_stirparo))
+embryo_integrated_stirparo <- IntegrateData(anchorset = anchors, dims = 1:30,features.to.integrate=all_genes)
+
+DefaultAssay(embryo_integrated_stirparo) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+embryo_integrated_stirparo <- ScaleData(embryo_integrated_stirparo, features = all_genes,verbose = FALSE)
+embryo_integrated_stirparo <- RunPCA(embryo_integrated_stirparo, npcs = 30, verbose = FALSE)
+embryo_integrated_stirparo <- FindNeighbors(object = embryo_integrated_stirparo)
+embryo_integrated_stirparo <- FindClusters(embryo_integrated_stirparo,res=0.05)
+embryo_integrated_stirparo <- RunTSNE(embryo_integrated_stirparo, reduction = "pca", dims = 1:30)
+
+embryo_integrated_stirparo@meta.data$Age[grepl('embryo',embryo_integrated_stirparo@meta.data$orig.ident)]=11
+embryo_integrated_stirparo@meta.data$Age[embryo_integrated_stirparo@meta.data$orig.ident%in%paste0("embryo",c(1,2,7,12,14))]=9
+
+#Annotate the epiblast cells 
+embryo_integrated_stirparo@meta.data$Epi="0"
+embryo_integrated_stirparo@meta.data$Epi[embryo_integrated_stirparo@meta.data$seurat_clusters==2&embryo_integrated_stirparo@meta.data$Age==11]="Post-Epi"
+embryo_integrated_stirparo@meta.data$Epi[embryo_integrated_stirparo@meta.data$seurat_clusters==2&embryo_integrated_stirparo@meta.data$Age==9]="Peri-Epi"
+embryo_integrated_stirparo@meta.data$Epi[rownames(embryo_integrated_stirparo@meta.data)%in%cell_info$Sample[cell_info$Stage=="epi"]]="Pre-Epi"
+embryo_integrated_stirparo@meta.data$Epi[rownames(embryo_integrated_stirparo@meta.data)%in%cell_info$Sample[cell_info$Stage=="earlyICM"]]="ICM"
+epi_cells=rownames(embryo_integrated_stirparo@meta.data)[embryo_integrated_stirparo@meta.data$Epi!="0"]
+
+saveRDS(embryo_integrated_stirparo,"embryo_integrated_stirparo.Rdata")
+
+embryo_epi=subset(embryo_integrated_stirparo,cells = epi_cells)
+DimPlot(embryo_epi, reduction = "pca", group.by = "Epi") #Fi
+
+#Compare and plot expression levels
+
+mat = GetAssayData(object = embryo_integrated_stirparo,assay="RNA",slot = "data")[,embryo_integrated_stirparo@meta.data$Epi!="0"]
+epi_state=embryo_integrated_stirparo@meta.data$Epi[embryo_integrated_stirparo@meta.data$Epi!="0"]
+
+epi_state=factor(epi_state,levels=c("ICM","Pre-Epi","Peri-Epi","Post-Epi"),ordered = T)
+naive_pluripotency = c("PRDM14","TFCP2L1","KLF2","KLF4","KLF5","KLF17","ZFP42","TBX3","ESRRB","DNMT3L","NR0B1","UTF1","SOX15")
+primed = c("FGF5","FGF2","OTX2","DNMT3B","NODAL","POU3F1","SOX11","SFRP2","SALL2")
+core = c("POU5F1","NANOG","SOX2")
+
+#Fig1d
+pdf("naive_pluripotency_epiblast_with_yaxis_2020_07_27_4stages.pdf",width=1.5*length(naive_pluripotency),height=2.2,useDingbats = F)
+par(mar=c(2,2,4.1,1),mfrow=c(1,length(naive_pluripotency)))
+for (Gene in naive_pluripotency){
+  stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xaxt='n',
+             method = "jitter", pch = 20, col = "white",
+             xlab="",ylab="",main=Gene,cex.main=2)
+  
+  grid(col = "lightgray", lty = "dashed")
+  stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xlab="",cex=1.2,
+             method = "jitter", add=T,pch = 20, col = c("dodgerblue3","olivedrab3","darkviolet","firebrick"))
+  median(mat[Gene,epi_state=="ICM"])
+  segments(y0=median(mat[Gene,epi_state=="ICM"]),x0=0.85,x1=1.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Pre-Epi"]),x0=1.85,x1=2.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Peri-Epi"]),x0=2.85,x1=3.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Post-Epi"]),x0=3.85,x1=4.15,lwd=3)
+}
+dev.off()
+
+#Fig1e
+pdf("primed_pluripotency_epiblast_with_yaxis_2020_07_27_4stages.pdf",width=1.5*length(primed),height=2.2,useDingbats = F)
+par(mar=c(2,2,4.1,1),mfrow=c(1,length(primed)))
+for (Gene in primed){
+  if(all(mat[Gene,]==0)){
+    stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xaxt='n',
+               method = "jitter", pch = 20, col = "white",ylim=c(0,1),
+               xlab="",ylab="",main=Gene,cex.main=2)
+  }else{
+    stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xaxt='n',
+               method = "jitter", pch = 20, col = "white",
+               xlab="",ylab="",main=Gene,cex.main=2)
+  }
+  
+  grid(col = "lightgray", lty = "dashed")
+  stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xlab="",cex=1.2,
+             method = "jitter", add=T,pch = 20, col = c("dodgerblue3","olivedrab3","darkviolet","firebrick"))
+  median(mat[Gene,epi_state=="ICM"])
+  segments(y0=median(mat[Gene,epi_state=="ICM"]),x0=0.85,x1=1.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Pre-Epi"]),x0=1.85,x1=2.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Peri-Epi"]),x0=2.85,x1=3.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Post-Epi"]),x0=3.85,x1=4.15,lwd=3)
+  
+}
+dev.off()
+
+#Fig1f
+pdf("core_pluripotency_epiblast_with_yaxis_2020_07_27_4stages.pdf",width=1.5*length(core),height=2.2,useDingbats = F)
+par(mar=c(2,2,4.1,1),mfrow=c(1,length(core)))
+for (Gene in core){
+  stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xaxt='n',
+             method = "jitter", pch = 20, col = "white",
+             xlab="",ylab="",main=Gene,cex.main=2)
+  
+  grid(col = "lightgray", lty = "dashed")
+  stripchart(mat[Gene,] ~ epi_state, vertical = TRUE,xlab="",cex=1.2,
+             method = "jitter", add=T,pch = 20, col = c("dodgerblue3","olivedrab3","darkviolet","firebrick"))
+  median(mat[Gene,epi_state=="ICM"])
+  segments(y0=median(mat[Gene,epi_state=="ICM"]),x0=0.85,x1=1.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Pre-Epi"]),x0=1.85,x1=2.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Peri-Epi"]),x0=2.85,x1=3.15,lwd=3)
+  segments(y0=median(mat[Gene,epi_state=="Post-Epi"]),x0=3.85,x1=4.15,lwd=3)
+
+}
+dev.off()
