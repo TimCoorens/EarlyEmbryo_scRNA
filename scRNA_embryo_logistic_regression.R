@@ -66,6 +66,16 @@ saveRDS(fit,"logistic_regression_own_data_fit_zhou.Rdata")
 
 preds=predictSimilarity(fit=fit,tgtData=test_dat,classes=embryo_integrated_zhou@meta.data[zhou_select,"Cell_Type"],logits=F)
 
+
+wilcox.test(preds[classes=="Zhou_Epi","Epi"],preds[classes=="Zhou_Epi","Hypo"])
+wilcox.test(preds[classes=="Zhou_Epi","Epi"],preds[classes=="Zhou_Epi","TE"])
+
+wilcox.test(preds[classes=="Zhou_Hypo","Hypo"],preds[classes=="Zhou_Hypo","Epi"])
+wilcox.test(preds[classes=="Zhou_Hypo","Hypo"],preds[classes=="Zhou_Hypo","TE"])
+
+wilcox.test(preds[classes=="Zhou_TE","TE"],preds[classes=="Zhou_TE","Epi"])
+wilcox.test(preds[classes=="Zhou_TE","TE"],preds[classes=="Zhou_TE","Hypo"])
+
 preds=preds[,c("Epi","Hypo","TE")]
 note_color=rep('black',9)
 note_color[t(preds)>0.5]="white"
@@ -138,6 +148,27 @@ fit=trainModel(refMat=training_dat,classes=classes)
 saveRDS(fit,"logistic_regression_own_data_fit_xiang.Rdata")
 
 preds=predictSimilarity(fit=fit,tgtData=test_dat,classes=embryo_integrated_xiang@meta.data[xiang_select,"Cell_Type"],logits=F)
+
+wilcox.test(preds[xiang_classes=="Xiang_Epi","Epi"],preds[xiang_classes=="Xiang_Epi","Hypo"])
+wilcox.test(preds[xiang_classes=="Xiang_Epi","Epi"],preds[xiang_classes=="Xiang_Epi","CTB"])
+wilcox.test(preds[xiang_classes=="Xiang_Epi","Epi"],preds[xiang_classes=="Xiang_Epi","STB"])
+
+wilcox.test(preds[xiang_classes=="Xiang_PrE","Hypo"],preds[xiang_classes=="Xiang_PrE","Epi"])
+wilcox.test(preds[xiang_classes=="Xiang_PrE","Hypo"],preds[xiang_classes=="Xiang_PrE","CTB"])
+wilcox.test(preds[xiang_classes=="Xiang_PrE","Hypo"],preds[xiang_classes=="Xiang_PrE","STB"])
+
+wilcox.test(preds[xiang_classes=="Xiang_CTB","CTB"],preds[xiang_classes=="Xiang_CTB","Epi"])
+wilcox.test(preds[xiang_classes=="Xiang_CTB","CTB"],preds[xiang_classes=="Xiang_CTB","Hypo"])
+wilcox.test(preds[xiang_classes=="Xiang_CTB","CTB"],preds[xiang_classes=="Xiang_CTB","STB"])
+
+wilcox.test(preds[xiang_classes=="Xiang_STB","STB"],preds[xiang_classes=="Xiang_STB","Epi"])
+wilcox.test(preds[xiang_classes=="Xiang_STB","STB"],preds[xiang_classes=="Xiang_STB","Hypo"])
+wilcox.test(preds[xiang_classes=="Xiang_STB","STB"],preds[xiang_classes=="Xiang_STB","CTB"])
+
+wilcox.test(preds[xiang_classes=="Xiang_PSA-EPI","Epi"],preds[xiang_classes=="Xiang_PSA-EPI","STB"])
+wilcox.test(preds[xiang_classes=="Xiang_PSA-EPI","Epi"],preds[xiang_classes=="Xiang_PSA-EPI","Hypo"])
+wilcox.test(preds[xiang_classes=="Xiang_PSA-EPI","Epi"],preds[xiang_classes=="Xiang_PSA-EPI","CTB"])
+
 write.table(preds,"preds_xiang.txt")
 
 rownames(preds)=c("Xiang_STB","Xiang_Epi","Xiang_PSA-EPI","Xiang_CTB")
