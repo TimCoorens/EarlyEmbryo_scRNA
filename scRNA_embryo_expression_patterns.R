@@ -39,6 +39,16 @@ bmp_dat=bmp_dat[order(bmp_dat,decreasing=TRUE)]
 wnt_dat=round(correlations[wnt],digits=2)
 wnt_dat=wnt_dat[order(wnt_dat,decreasing=TRUE)]
 
+correlations_qval=p.adjust(correlations_pval,method = "BH")
+pvals_vec_d11=correlations_qval[c(names(nodal_dat),names(bmp_dat),names(wnt_dat))]
+
+pvals_vec_d9=correlations_qval[c(names(nodal_dat),names(bmp_dat),names(wnt_dat))]
+
+
+pval=data.frame(day9=pvals_vec_d9,
+                day11=pvals_vec_d11)
+write.table(pval,"pval_CER1_correlation.txt",quote=F,sep="\t")
+
 dat=c(nodal_dat,bmp_dat,wnt_dat)
 inh=c(nodal,bmp,wnt)
 dat=round(correlations[inh],digits=2)
