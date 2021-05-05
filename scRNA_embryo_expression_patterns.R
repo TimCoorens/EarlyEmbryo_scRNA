@@ -27,6 +27,8 @@ day=9
 matrix_mod<-as.matrix(matrix[,embryo_hypo@meta.data$Age==day])
 gene<-as.numeric(matrix_mod["CER1",])
 correlations<-apply(matrix_mod,1,function(x){cor(gene,x)})
+correlations_pval<-apply(matrix_mod,1,function(x){cor.test(gene,x)$p.value})
+
 nodal=c("LEFTY1","LEFTY2","NCLN","TMEFF1","HHEX")
 bmp=c("SOSTDC1","SOST","GREM2","DAND5","GREM1","NOG","CHRD","TWSG1")
 wnt=c("SFRP1","SFRP2","SFRP4","SFRP5","FRZB","DKK1","DKK2","DKK3","DKK4","DKKL1")
